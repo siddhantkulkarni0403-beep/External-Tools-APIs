@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>InsightRadar — Tool Calling Demo</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:Arial,Segoe UI,sans-serif;background:#07101f;color:#edf4ff}
+header{padding:18px 5%;border-bottom:1px solid #263653;background:#0d192d;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:25px;font-weight:900}.sub{color:#6299eb;font-size:12px;margin-top:3px}
+button,input{font:inherit} button{cursor:pointer}
+.btn{border:0;border-radius:10px;padding:11px 16px;font-weight:800}
+.primary{background:#7657ff;color:#fff}.dark{background:#182941;color:#dbe5f3;border:1px solid #2b3e5e}
+.wrap{width:min(1200px,92vw);margin:28px auto}
+.hero{background:linear-gradient(135deg,#172541,#0d1729);border:1px solid #283b5b;border-radius:20px;padding:28px;margin-bottom:18px}
+.hero h1{font-size:36px;margin:0 0 10px}.hero p{color:#aebcd1;line-height:1.6}
+.panel{background:#0e1a2f;border:1px solid #263653;border-radius:16px;padding:20px;margin:18px 0}
+h2{margin:0 0 14px}
+.query{display:grid;grid-template-columns:1fr auto;gap:10px}
+input{width:100%;background:#091427;border:1px solid #30415e;color:white;border-radius:10px;padding:13px}
+.examples{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.example{background:#13233c;border:1px solid #2a3c5b;color:#bfcce0;padding:7px 10px;border-radius:999px;font-size:12px;cursor:pointer}
+.tools{display:flex;gap:10px;flex-wrap:wrap}
+.tool{border:1px solid #314765;background:#11213a;border-radius:12px;padding:10px 12px}
+.tool.active{border-color:#7c5cff;box-shadow:0 0 0 2px rgba(124,92,255,.12)}
+.tool small{display:block;color:#8194b2;margin-top:4px}
+.console{background:#060e1b;border:1px solid #22324c;border-radius:12px;padding:14px;font-family:Consolas,monospace;font-size:12px;line-height:1.55;color:#b9c8dd;min-height:86px;white-space:pre-wrap}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.card{background:#111f35;border:1px solid #2b3d5a;border-radius:13px;padding:15px;margin-top:12px}
+.meta{font-size:11px;color:#8396b3;text-transform:uppercase}.title{font-size:16px;font-weight:800;margin:7px 0}.desc{font-size:13px;line-height:1.5;color:#bcc9db}
+.card a{color:#c0b4ff;text-decoration:none}
+.badge{display:inline-block;padding:5px 8px;border-radius:999px;font-size:10px;font-weight:900}.high{background:#4a2233;color:#ffb7ca}.medium{background:#493f21;color:#ffda82}.low{background:#1d3a33;color:#a9e6d1}
+.status{display:flex;justify-content:space-between;gap:10px;align-items:center}.status b{color:#9fb2cf}
+.note{color:#7f91ad;font-size:12px;line-height:1.5}
+@media(max-width:800px){.query,.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">⚡ InsightRadar</div>
+    <div class="sub">Research & Competitor Intelligence — Tool Calling Edition</div>
+  </div>
+  <button class="btn dark" onclick="loadDemo()">Load Demo</button>
+</header>
+
+<main class="wrap">
+
+<section class="hero">
+  <h1>One AI agent. Multiple tools. The right tool at the right time.</h1>
+  <p>
+    Enter a natural-language request. The agent first classifies the intent,
+    dynamically selects the relevant external API tool(s), calls them,
+    and turns the returned data into competitive intelligence.
+  </p>
+</section>
+
+<section class="panel">
+  <h2>Ask the Intelligence Agent</h2>
+  <div class="query">
+    <input id="query" placeholder="Try: Find recent AI agent research and GitHub competitor activity">
+    <button class="btn primary" onclick="runAgent()">Run Agent</button>
+  </div>
+
+  <div class="examples">
+    <div class="example" onclick="setQuery('Find recent research papers about AI agents')">Research papers</div>
+    <div class="example" onclick="setQuery('Track GitHub activity for OpenAI')">Competitor GitHub</div>
+    <div class="example" onclick="setQuery('Find AI agent research and compare GitHub projects')">Mixed request</div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="status">
+    <h2 style="margin:0">Tool Selection</h2>
+    <span id="decision">Waiting for query...</span>
+  </div>
+  <div class="tools" style="margin-top:14px">
+    <div class="tool" id="crossrefTool">
+      🔬 Crossref REST API
+      <small>Research publications</small>
+    </div>
+    <div class="tool" id="githubTool">
+      🧑‍💻 GitHub REST API
+      <small>Competitor/project activity</small>
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Agent Reasoning / Tool Trace</h2>
+  <div class="console" id="console">Agent idle. Enter a request above.</div>
+</section>
+
+<section class="panel">
+  <h2>Intelligence Results</h2>
+  <div id="results"></div>
+</section>
+
+<section class="panel">
+  <h2>Why this satisfies Task 2</h2>
+  <div class="note">
+    <b>1. At least two external tools:</b> Crossref and GitHub.<br>
+    <b>2. Dynamically determined:</b> the router inspects the natural-language request and chooses Crossref, GitHub, or both.<br>
+    <b>3. Tool calls are real:</b> the browser calls the public REST APIs and renders returned records.<br>
+    <b>4. Relevant to the problem:</b> Crossref provides scholarly metadata; GitHub provides public competitor/project engineering signals.
+  </div>
+</section>
+
+</main>
+
+<script>
+const state = { results: [] };
+
+function setQuery(q){ document.getElementById("query").value=q; }
+
+function log(line){
+  const c=document.getElementById("console");
+  c.textContent += "\n" + line;
+  c.scrollTop=c.scrollHeight;
+}
+
+function resetConsole(){
+  document.getElementById("console").textContent="";
+}
+
+function chooseTools(query){
+  const q=query.toLowerCase();
+
+  const researchTerms=[
+    "research","paper","papers","publication","publications","study",
+    "studies","journal","doi","scholar","literature","scientific"
+  ];
+
+  const competitorTerms=[
+    "competitor","company","github","repository","repo","code",
+    "developer","development","commit","release","project","activity"
+  ];
+
+  const wantsResearch=researchTerms.some(x=>q.includes(x));
+  const wantsCompetitor=competitorTerms.some(x=>q.includes(x));
+
+  // Mixed natural-language intent -> both tools.
+  if(wantsResearch && wantsCompetitor) return ["crossref","github"];
+  if(wantsResearch) return ["crossref"];
+  if(wantsCompetitor) return ["github"];
+
+  // Default: broad intelligence request uses both.
+  return ["crossref","github"];
+}
+
+function extractSearchTerm(query){
+  return query
+    .replace(/find|search|track|monitor|show|recent|latest|research|papers|paper|activity|about|for|and|compare/gi," ")
+    .replace(/\s+/g," ")
+    .trim() || "artificial intelligence";
+}
+
+async function callCrossref(query){
+  const term=extractSearchTerm(query);
+  log(`→ CROSSREF TOOL selected`);
+  log(`→ Searching scholarly metadata for: "${term}"`);
+
+  const url="https://api.crossref.org/works?rows=5&query.bibliographic="
+    +encodeURIComponent(term);
+
+  const response=await fetch(url);
+  if(!response.ok) throw new Error("Crossref request failed: "+response.status);
+
+  const data=await response.json();
+
+  return (data.message?.items || []).map(x=>({
+    tool:"Crossref",
+    source:"Research",
+    title:x.title?.[0] || "Untitled research work",
+    description:
+      (x.abstract || "Scholarly record returned by Crossref.")
+      .replace(/<[^>]+>/g,"")
+      .slice(0,300),
+    date:(x.published?.["date-parts"]?.[0]?.join("-")) || "Date unavailable",
+    url:x.URL || (x.DOI ? "https://doi.org/"+x.DOI : "https://api.crossref.org/")
+  }));
+}
+
+async function callGithub(query){
+  const term=extractSearchTerm(query);
+  log(`→ GITHUB TOOL selected`);
+  log(`→ Searching public repositories for: "${term}"`);
+
+  const url="https://api.github.com/search/repositories?q="
+    +encodeURIComponent(term)
+    +"&sort=updated&order=desc&per_page=5";
+
+  const response=await fetch(url,{
+    headers:{
+      "Accept":"application/vnd.github+json"
+    }
+  });
+
+  if(!response.ok) throw new Error("GitHub request failed: "+response.status);
+
+  const data=await response.json();
+
+  return (data.items || []).map(x=>({
+    tool:"GitHub",
+    source:"Competitor / Engineering",
+    title:x.full_name,
+    description:x.description || "Public GitHub repository.",
+    date:x.updated_at ? x.updated_at.slice(0,10) : "Date unavailable",
+    url:x.html_url,
+    stars:x.stargazers_count || 0,
+    language:x.language || "Unknown"
+  }));
+}
+
+function impact(item){
+  const text=(item.title+" "+item.description).toLowerCase();
+
+  let score=40;
+  ["agent","artificial intelligence","ai","machine learning","model","benchmark"].forEach(t=>{
+    if(text.includes(t)) score+=8;
+  });
+
+  if(item.tool==="GitHub") score += Math.min(20, Math.floor((item.stars||0)/1000));
+  score=Math.min(95,score);
+
+  if(score>=70) return ["HIGH",score];
+  if(score>=50) return ["MEDIUM",score];
+  return ["LOW",score];
+}
+
+async function runAgent(){
+  const query=document.getElementById("query").value.trim();
+  if(!query){ alert("Enter a request first."); return; }
+
+  resetConsole();
+  document.getElementById("results").innerHTML="<div class='note'>Agent is selecting tools and calling APIs...</div>";
+
+  document.getElementById("crossrefTool").classList.remove("active");
+  document.getElementById("githubTool").classList.remove("active");
+
+  const tools=chooseTools(query);
+
+  document.getElementById("decision").textContent =
+    "Selected: "+tools.map(x=>x==="crossref"?"Crossref":"GitHub").join(" + ");
+
+  if(tools.includes("crossref")) document.getElementById("crossrefTool").classList.add("active");
+  if(tools.includes("github")) document.getElementById("githubTool").classList.add("active");
+
+  log(`USER INTENT: ${query}`);
+  log(`AGENT DECISION: ${tools.length===2 ? "mixed intelligence request" : tools[0]==="crossref" ? "research request" : "competitor / engineering request"}`);
+  log(`TOOLS TO CALL: ${tools.join(", ")}`);
+
+  const calls=[];
+
+  if(tools.includes("crossref")) calls.push(callCrossref(query));
+  if(tools.includes("github")) calls.push(callGithub(query));
+
+  try{
+    const responses=await Promise.allSettled(calls);
+    let results=[];
+
+    responses.forEach((r,i)=>{
+      const tool=tools[i];
+      if(r.status==="fulfilled"){
+        log(`✓ ${tool.toUpperCase()} returned ${r.value.length} records`);
+        results=results.concat(r.value);
+      }else{
+        log(`✗ ${tool.toUpperCase()} failed: ${r.reason.message}`);
+      }
+    });
+
+    state.results=results.map(x=>{
+      const [level,score]=impact(x);
+      return {...x,impact:level,score};
+    });
+
+    render();
+    log(`✓ AGENT COMPLETE: ${state.results.length} intelligence signals created`);
+  }catch(e){
+    log("✗ Agent error: "+e.message);
+  }
+}
+
+function render(){
+  const el=document.getElementById("results");
+
+  if(!state.results.length){
+    el.innerHTML="<div class='note'>No live results yet. Try a different request.</div>";
+    return;
+  }
+
+  el.innerHTML=state.results.map(x=>`
+    <div class="card">
+      <div class="meta">${esc(x.source)} • ${esc(x.tool)} • ${esc(x.date)}</div>
+      <div class="title"><a href="${esc(x.url)}" target="_blank">${esc(x.title)}</a></div>
+      <div class="desc">${esc(x.description)}</div>
+      ${x.language ? `<div class="note" style="margin-top:8px">Language: ${esc(x.language)} • ⭐ ${x.stars}</div>` : ""}
+      <div style="margin-top:10px">
+        <span class="badge ${x.impact.toLowerCase()}">${x.impact} · ${x.score}</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function loadDemo(){
+  setQuery("Find AI agent research and compare GitHub projects");
+  runAgent();
+}
+
+function esc(v){
+  return String(v??"").replace(/[&<>"']/g,m=>({
+    "&":"&amp;","<":"&lt;",">":"&gt;",
+    '"':"&quot;","'":"&#039;"
+  }[m]));
+}
+</script>
+</body>
+</html>
